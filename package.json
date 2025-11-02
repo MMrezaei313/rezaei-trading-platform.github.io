@@ -1,0 +1,42 @@
+
+### **۲. فایل `package.json` اصلی**
+```json
+{
+  "name": "rezaei-trading-platform",
+  "version": "1.0.0",
+  "description": "پلتفرم معاملات الگوریتمی ایران - بورس، فرابورس، طلا، ارز دیجیتال",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run frontend\" \"npm run backend\" \"npm run ai-engine\"",
+    "frontend": "cd frontend && npm run serve",
+    "backend": "cd backend && npm run dev",
+    "ai-engine": "cd backend/src/enhanced_ai && npm start",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "test": "npm run test:frontend && npm run test:backend",
+    "test:frontend": "cd frontend && npm run test",
+    "test:backend": "cd backend && npm run test",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "keywords": [
+    "trading",
+    "algorithmic",
+    "iran",
+    "stock",
+    "crypto",
+    "ai",
+    "bot"
+  ],
+  "author": "MMrezaei313",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
