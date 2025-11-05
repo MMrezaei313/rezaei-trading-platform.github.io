@@ -1,468 +1,199 @@
-import { AIModel } from '../models/ai/ai-model.model.js'
-import { TrainingResult } from '../models/ai/training-result.model.js'
-import { Prediction } from '../models/ai/prediction.model.js'
-import { AITrainingService } from '../services/ai/ai-training.service.js'
-import { PredictionService } from '../services/ai/prediction.service.js'
+import { AIModel } from '../models/ai/ai-model.model.js';
+import { TrainingResult } from '../models/ai/training-result.model.js';
+import { Prediction } from '../models/ai/prediction.model.js';
+import { AITrainingService } from '../services/ai/ai-training.service.js';
+import { PredictionService } from '../services/ai/prediction.service.js';
+
+const STATUS = Object.freeze({
+  IDLE: 'idle',
+  TRAINING: 'training',
+  TRAINED: 'trained',
+  ERROR: 'error',
+  DEPLOYED: 'deployed',
+});
+
+function handleError(res, error, message = 'خطایی رخ داده است', statusCode = 500) {
+  console.error(message, error);
+  res.status(statusCode).json({
+    success: false,
+    message,
+    ...(process.env.NODE_ENV === 'development' && { error: error.message }),
+  });
+}
 
 export class AIController {
   constructor() {
-    this.trainingService = new AITrainingService()
-    this.predictionService = new PredictionService()
+    this.trainingService = new AITrainingService();
+    this.predictionService = new PredictionService();
   }
 
-  /**
-   * Get all AI models for user
-   */
+  async validateAndGetModel(modelId, userId) {
+    const model = await AIModel.findOne({ _id: modelId, userId });
+    if (!model) {
+      throw new Error('مدل یافت نشد');
+    }
+    return model;
+  }
+
   async getModels(req, res) {
     try {
-      const userId = req.user.userId
-      const { type, status, page = 1, limit = 50 } = req.query
+      const userId = req.user.userId;
+      const { type, status, page = 1, limit = 50 } = req.query;
 
-      const filter = { userId }
+      const filter = { userId, ...(type && { type }), ...(status && { status }) };
 
-      if (type) filter.type = type
-      if (status) filter.status = status
-
-      const models = await AIModel.find(filter)
-        .sort({ createdAt: -1 })
-        .limit(parseInt(limit))
-        .skip((parseInt(page) - 1) * parseInt(limit))
-
-      const total = await AIModel.countDocuments(filter)
+      const [models, total] = await Promise.all([
+        AIModel.find(filter)
+          .sort({ createdAt: -1 })
+          .limit(parseInt(limit))
+          .skip((page - 1) * parseInt(limit)),
+        AIModel.countDocuments(filter),
+      ]);
 
       res.json({
         success: true,
-        models: models.map(model => model.toObject()),
+        models: models.map((model) => model.toObject()),
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
           total,
-          pages: Math.ceil(total / parseInt(limit))
-        }
-      })
-
+          pages: Math.ceil(total / parseInt(limit)),
+        },
+      });
     } catch (error) {
-      console.error('Get AI models error:', error)
-      res.status(500).json({
-        success: false,
-        message: 'خطا در دریافت مدل‌های هوش مصنوعی',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      })
+      handleError(res, error, 'خطا در دریافت مدل‌های هوش مصنوعی');
     }
   }
 
-  /**
-   * Create new AI model
-   */
   async createModel(req, res) {
     try {
-      const userId = req.user.userId
-      const modelData = req.body
-
-      // Validate model data
-      const validation = this.validateModelData(modelData)
-      if (!validation.isValid) {
-        return res.status(400).json({
-          success: false,
-          message: validation.message,
-          errors: validation.errors
-        })
-      }
+      const userId = req.user.userId;
+      const modelData = req.body;
 
       const model = new AIModel({
         userId,
         ...modelData,
-        status: 'idle',
+        status: STATUS.IDLE,
         accuracy: 0,
         predictions: 0,
         profit: 0,
         deployed: false,
         createdAt: new Date(),
-        updatedAt: new Date()
-      })
+        updatedAt: new Date(),
+      });
 
-      await model.save()
+      await model.save();
 
       res.status(201).json({
         success: true,
         message: 'مدل هوش مصنوعی با موفقیت ایجاد شد',
-        model: model.toObject()
-      })
-
+        model: model.toObject(),
+      });
     } catch (error) {
-      console.error('Create AI model error:', error)
-      res.status(500).json({
-        success: false,
-        message: 'خطا در ایجاد مدل هوش مصنوعی',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      })
+      handleError(res, error, 'خطا در ایجاد مدل هوش مصنوعی');
     }
   }
 
-  /**
-   * Update AI model
-   */
   async updateModel(req, res) {
     try {
-      const userId = req.user.userId
-      const { modelId } = req.params
-      const updates = req.body
+      const userId = req.user.userId;
+      const { modelId } = req.params;
+      const updates = req.body;
 
-      const model = await AIModel.findOne({ _id: modelId, userId })
-      if (!model) {
-        return res.status(404).json({
-          success: false,
-          message: 'مدل یافت نشد'
-        })
-      }
+      const model = await this.validateAndGetModel(modelId, userId);
 
-      // Validate updates
-      const validation = this.validateModelData(updates, true)
-      if (!validation.isValid) {
-        return res.status(400).json({
-          success: false,
-          message: validation.message,
-          errors: validation.errors
-        })
-      }
-
-      // Update model
-      Object.assign(model, updates, { updatedAt: new Date() })
-      await model.save()
+      Object.assign(model, updates, { updatedAt: new Date() });
+      await model.save();
 
       res.json({
         success: true,
         message: 'مدل با موفقیت بروزرسانی شد',
-        model: model.toObject()
-      })
-
+        model: model.toObject(),
+      });
     } catch (error) {
-      console.error('Update AI model error:', error)
-      res.status(500).json({
-        success: false,
-        message: 'خطا در بروزرسانی مدل',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      })
+      handleError(res, error, 'خطا در بروزرسانی مدل');
     }
   }
 
-  /**
-   * Delete AI model
-   */
   async deleteModel(req, res) {
     try {
-      const userId = req.user.userId
-      const { modelId } = req.params
+      const userId = req.user.userId;
+      const { modelId } = req.params;
 
-      const model = await AIModel.findOne({ _id: modelId, userId })
-      if (!model) {
-        return res.status(404).json({
-          success: false,
-          message: 'مدل یافت نشد'
-        })
-      }
+      const model = await this.validateAndGetModel(modelId, userId);
 
       if (model.deployed) {
-        return res.status(400).json({
-          success: false,
-          message: 'امکان حذف مدل فعال وجود ندارد'
-        })
+        return handleError(res, null, 'امکان حذف مدل فعال وجود ندارد', 400);
       }
 
-      await AIModel.findByIdAndDelete(modelId)
-
-      // Also delete related training results and predictions
-      await TrainingResult.deleteMany({ modelId })
-      await Prediction.deleteMany({ modelId })
+      await Promise.all([
+        AIModel.findByIdAndDelete(modelId),
+        TrainingResult.deleteMany({ modelId }),
+        Prediction.deleteMany({ modelId }),
+      ]);
 
       res.json({
         success: true,
-        message: 'مدل با موفقیت حذف شد'
-      })
-
+        message: 'مدل با موفقیت حذف شد',
+      });
     } catch (error) {
-      console.error('Delete AI model error:', error)
-      res.status(500).json({
-        success: false,
-        message: 'خطا در حذف مدل',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      })
+      handleError(res, error, 'خطا در حذف مدل');
     }
   }
 
-  /**
-   * Train AI model
-   */
   async trainModel(req, res) {
     try {
-      const userId = req.user.userId
-      const { modelId } = req.params
+      const userId = req.user.userId;
+      const { modelId } = req.params;
 
-      const model = await AIModel.findOne({ _id: modelId, userId })
-      if (!model) {
-        return res.status(404).json({
-          success: false,
-          message: 'مدل یافت نشد'
-        })
+      const model = await this.validateAndGetModel(modelId, userId);
+
+      if (model.status === STATUS.TRAINING) {
+        return handleError(res, null, 'مدل در حال حاضر در حال آموزش است', 400);
       }
 
-      if (model.status === 'training') {
-        return res.status(400).json({
-          success: false,
-          message: 'مدل در حال حاضر در حال آموزش است'
-        })
-      }
+      model.status = STATUS.TRAINING;
+      model.trainingProgress = 0;
+      model.updatedAt = new Date();
+      await model.save();
 
-      // Start training process
-      model.status = 'training'
-      model.trainingProgress = 0
-      model.updatedAt = new Date()
-      await model.save()
-
-      // Start training in background
-      this.trainingService.startTraining(model)
+      this.trainingService
+        .startTraining(model)
         .then(async (trainingResult) => {
-          // Update model with training results
-          model.status = 'trained'
-          model.accuracy = trainingResult.accuracy
-          model.trainingProgress = 100
-          model.lastTrained = new Date()
-          model.updatedAt = new Date()
-          await model.save()
+          Object.assign(model, {
+            status: STATUS.TRAINED,
+            accuracy: trainingResult.accuracy,
+            trainingProgress: 100,
+            lastTrained: new Date(),
+            updatedAt: new Date(),
+          });
+          await model.save();
 
-          // Save training result
           const trainingRecord = new TrainingResult({
             modelId,
             userId,
             config: model,
             results: trainingResult,
-            trainedAt: new Date()
-          })
-          await trainingRecord.save()
+            trainedAt: new Date(),
+          });
+          await trainingRecord.save();
         })
         .catch(async (error) => {
-          console.error('Training error:', error)
-          model.status = 'error'
-          model.errorMessage = error.message
-          model.updatedAt = new Date()
-          await model.save()
-        })
+          Object.assign(model, {
+            status: STATUS.ERROR,
+            errorMessage: error.message,
+            updatedAt: new Date(),
+          });
+          await model.save();
+        });
 
       res.json({
         success: true,
         message: 'آموزش مدل آغاز شد',
-        model: model.toObject()
-      })
-
+        model: model.toObject(),
+      });
     } catch (error) {
-      console.error('Train AI model error:', error)
-      res.status(500).json({
-        success: false,
-        message: 'خطا در شروع آموزش مدل',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      })
+      handleError(res, error, 'خطا در شروع آموزش مدل');
     }
   }
-
-  /**
-   * Deploy AI model
-   */
-  async deployModel(req, res) {
-    try {
-      const userId = req.user.userId
-      const { modelId } = req.params
-
-      const model = await AIModel.findOne({ _id: modelId, userId })
-      if (!model) {
-        return res.status(404).json({
-          success: false,
-          message: 'مدل یافت نشد'
-        })
-      }
-
-      if (model.status !== 'trained') {
-        return res.status(400).json({
-          success: false,
-          message: 'مدل آموزش دیده نیست'
-        })
-      }
-
-      if (model.deployed) {
-        return res.status(400).json({
-          success: false,
-          message: 'مدل در حال حاضر فعال است'
-        })
-      }
-
-      // Deploy model
-      model.deployed = true
-      model.deployedAt = new Date()
-      model.updatedAt = new Date()
-      await model.save()
-
-      // Start making predictions with deployed model
-      this.predictionService.startPredictions(model)
-
-      res.json({
-        success: true,
-        message: 'مدل با موفقیت فعال شد',
-        model: model.toObject()
-      })
-
-    } catch (error) {
-      console.error('Deploy AI model error:', error)
-      res.status(500).json({
-        success: false,
-        message: 'خطا در فعال‌سازی مدل',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      })
-    }
-  }
-
-  /**
-   * Undeploy AI model
-   */
-  async undeployModel(req, res) {
-    try {
-      const userId = req.user.userId
-      const { modelId } = req.params
-
-      const model = await AIModel.findOne({ _id: modelId, userId })
-      if (!model) {
-        return res.status(404).json({
-          success: false,
-          message: 'مدل یافت نشد'
-        })
-      }
-
-      if (!model.deployed) {
-        return res.status(400).json({
-          success: false,
-          message: 'مدل فعال نیست'
-        })
-      }
-
-      // Undeploy model
-      model.deployed = false
-      model.updatedAt = new Date()
-      await model.save()
-
-      // Stop predictions
-      this.predictionService.stopPredictions(modelId)
-
-      res.json({
-        success: true,
-        message: 'مدل با موفقیت غیرفعال شد',
-        model: model.toObject()
-      })
-
-    } catch (error) {
-      console.error('Undeploy AI model error:', error)
-      res.status(500).json({
-        success: false,
-        message: 'خطا در غیرفعال‌سازی مدل',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      })
-    }
-  }
-
-  /**
-   * Get predictions for model
-   */
-  async getPredictions(req, res) {
-    try {
-      const userId = req.user.userId
-      const { modelId } = req.params
-      const { page = 1, limit = 50 } = req.query
-
-      const predictions = await Prediction.find({ modelId, userId })
-        .sort({ timestamp: -1 })
-        .limit(parseInt(limit))
-        .skip((parseInt(page) - 1) * parseInt(limit))
-
-      const total = await Prediction.countDocuments({ modelId, userId })
-
-      res.json({
-        success: true,
-        predictions: predictions.map(prediction => prediction.toObject()),
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          pages: Math.ceil(total / parseInt(limit))
-        }
-      })
-
-    } catch (error) {
-      console.error('Get predictions error:', error)
-      res.status(500).json({
-        success: false,
-        message: 'خطا در دریافت پیش‌بینی‌ها',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      })
-    }
-  }
-
-  /**
-   * Get recent predictions
-   */
-  async getRecentPredictions(req, res) {
-    try {
-      const userId = req.user.userId
-      const { limit = 20 } = req.query
-
-      const predictions = await Prediction.find({ userId })
-        .sort({ timestamp: -1 })
-        .limit(parseInt(limit))
-        .populate('modelId', 'name type')
-
-      res.json({
-        success: true,
-        predictions: predictions.map(prediction => ({
-          ...prediction.toObject(),
-          modelName: prediction.modelId?.name
-        }))
-      })
-
-    } catch (error) {
-      console.error('Get recent predictions error:', error)
-      res.status(500).json({
-        success: false,
-        message: 'خطا در دریافت پیش‌بینی‌های اخیر',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      })
-    }
-  }
-
-  /**
-   * Get AI configuration
-   */
-  async getAIConfig(req, res) {
-    try {
-      const userId = req.user.userId
-
-      // In a real implementation, this would fetch from a config collection
-      const config = {
-        enabled: true,
-        maxConcurrentModels: 5,
-        autoRetrain: true,
-        retrainInterval: 7, // days
-        predictionConfidenceThreshold: 0.7,
-        riskLimits: {
-          maxPositionSize: 10,
-          maxDailyPredictions: 100,
-          minConfidence: 0.6
-        }
-      }
-
-      res.json({
-        success: true,
-        config
-      })
-
-    } catch (error) {
-      console.error('Get AI config error:', error)
-      res.status(500).json({
-        success: false,
-        message: 'خطا در دریافت تنظیمات هوش مصنوعی',
-        error: process.env.NODE_ENV === 'development'
+}
