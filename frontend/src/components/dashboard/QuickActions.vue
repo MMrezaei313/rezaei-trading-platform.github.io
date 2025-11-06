@@ -240,7 +240,7 @@ export default {
       try {
         switch (actionType) {
           case 'quickMarketBuy':
-            await store.dispatch('trading/quickMarketBuy')
+            await api.post با endpoint واقعی)
             toast.success('درخواست خرید بازار ثبت شد')
             break
             
