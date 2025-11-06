@@ -1,9 +1,10 @@
 import { api } from '@/services/api'
 
-const state = {
-  user: null,
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token')
+const actions = {
+  async login({ commit }, credentials) {
+    const response = await api.post('/auth/login', credentials)
+    // مدیریت token و user از پاسخ سرور
+  }
 }
 
 const mutations = {
