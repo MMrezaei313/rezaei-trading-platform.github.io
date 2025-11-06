@@ -109,7 +109,7 @@ export default {
 
       try {
         // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        await api.post('/auth/forgot-password', {email})
         
         // In real app, call: await store.dispatch('auth/forgotPassword', formData.email)
         showSuccess.value = true
