@@ -232,57 +232,7 @@ export default {
       loading.value = true
       try {
         // Simulate API call - replace with actual API
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        // Mock data - replace with actual data from store/API
-        activities.value = [
-          {
-            id: 1,
-            type: 'trade',
-            title: 'معامله انجام شد',
-            description: 'خرید سهم فولاد با موفقیت انجام شد',
-            timestamp: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
-            metadata: {
-              symbol: 'فولاد',
-              side: 'buy',
-              quantity: 1000,
-              price: 14500
-            },
-            actionable: true
-          },
-          {
-            id: 2,
-            type: 'order',
-            title: 'سفارش لغو شد',
-            description: 'سفارش فروش خودرو لغو شد',
-            timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-            metadata: {
-              symbol: 'خودرو',
-              status: 'cancelled'
-            },
-            actionable: false
-          },
-          {
-            id: 3,
-            type: 'strategy',
-            title: 'استراتژی فعال شد',
-            description: 'استراتژی میانگین متحرک فعال شد',
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-            metadata: {
-              strategyName: 'میانگین متحرک',
-              performance: 0.025
-            },
-            actionable: true
-          },
-          {
-            id: 4,
-            type: 'system',
-            title: 'اتصال به صرافی',
-            description: 'اتصال به صرافی نوبیتکس برقرار شد',
-            timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
-            actionable: false
-          }
-        ]
+        const response = await api.get('/activities')
       } catch (error) {
         toast.error('خطا در بارگذاری فعالیت‌ها')
         console.error('Load activities error:', error)
