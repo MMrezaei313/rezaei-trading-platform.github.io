@@ -264,13 +264,7 @@ export default {
       loading.value = true
 
       try {
-        const result = await store.dispatch('auth/register', {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          phone: formData.phone,
-          password: formData.password
-        })
+        const result = await await api.post('/auth/register', formData)
 
         if (result.success) {
           showSuccessModal.value = true
