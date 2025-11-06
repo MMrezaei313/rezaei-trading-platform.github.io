@@ -295,4 +295,984 @@
               
               <button 
                 @click="viewStrategy(strategy)"
-               
+                class="btn btn-secondary btn-sm"
+              >
+                <i class="icon-eye"></i>
+                مشاهده
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="filteredStrategies.length > pageSize" class="pagination">
+      <button 
+        class="pagination-btn"
+        :disabled="currentPage === 1"
+        @click="currentPage--"
+      >
+        <i class="icon-chevron-left"></i>
+      </button>
+      
+      <span class="pagination-info">
+        صفحه {{ currentPage }} از {{ totalPages }}
+      </span>
+      
+      <button 
+        class="pagination-btn"
+        :disabled="currentPage === totalPages"
+        @click="currentPage++"
+      >
+        <i class="icon-chevron-right"></i>
+      </button>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <Modal 
+      v-if="showDeleteModal"
+      @close="showDeleteModal = false"
+      title="حذف استراتژی"
+    >
+      <div class="delete-modal">
+        <i class="icon-alert-triangle warning-icon"></i>
+        <h4>آیا از حذف استراتژی "{{ strategyToDelete?.name }}" مطمئن هستید؟</h4>
+        <p>این عمل قابل بازگشت نیست و تمام داده‌های مرتبط با این استراتژی حذف خواهند شد.</p>
+        
+        <div class="modal-actions">
+          <button class="btn btn-danger" @click="confirmDelete">
+            حذف استراتژی
+          </button>
+          <button class="btn btn-secondary" @click="showDeleteModal = false">
+            انصراف
+          </button>
+        </div>
+      </div>
+    </Modal>
+  </div>
+</template>
+
+<script>
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useStore } from 'vuex'
+import { useToast } from 'vue-toastification'
+import Modal from '@/components/shared/Modal.vue'
+
+export default {
+  name: 'StrategyList',
+  components: {
+    Modal
+  },
+  setup() {
+    const router = useRouter()
+    const store = useStore()
+    const toast = useToast()
+
+    const strategies = ref([])
+    const loading = ref(false)
+    const showBulkActions = ref(false)
+    const showDeleteModal = ref(false)
+    const activeActionMenu = ref(null)
+    const currentPage = ref(1)
+    const pageSize = 12
+
+    const selectedStrategies = ref([])
+    const strategyToDelete = ref(null)
+    const filters = ref({
+      search: '',
+      status: 'all',
+      type: 'all'
+    })
+
+    // Computed properties
+    const stats = computed(() => {
+      const active = strategies.value.filter(s => s.status === 'active').length
+      const inactive = strategies.value.filter(s => s.status === 'inactive').length
+      const total = strategies.value.length
+      
+      const totalProfit = strategies.value.reduce((sum, s) => 
+        sum + s.performance.totalProfit, 0
+      )
+      const avgProfit = total > 0 ? totalProfit / total : 0
+
+      return {
+        active,
+        inactive,
+        total,
+        avgProfit
+      }
+    })
+
+    const filteredStrategies = computed(() => {
+      let filtered = strategies.value
+
+      // Filter by search
+      if (filters.value.search) {
+        const searchTerm = filters.value.search.toLowerCase()
+        filtered = filtered.filter(s => 
+          s.name.toLowerCase().includes(searchTerm) ||
+          s.description.toLowerCase().includes(searchTerm)
+        )
+      }
+
+      // Filter by status
+      if (filters.value.status !== 'all') {
+        filtered = filtered.filter(s => s.status === filters.value.status)
+      }
+
+      // Filter by type
+      if (filters.value.type !== 'all') {
+        filtered = filtered.filter(s => s.type === filters.value.type)
+      }
+
+      return filtered.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    })
+
+    const hasSelectedStrategies = computed(() => selectedStrategies.value.length > 0)
+
+    const totalPages = computed(() => 
+      Math.ceil(filteredStrategies.value.length / pageSize)
+    )
+
+    const paginatedStrategies = computed(() => {
+      const start = (currentPage.value - 1) * pageSize
+      const end = start + pageSize
+      return filteredStrategies.value.slice(start, end)
+    })
+
+    // Methods
+    const loadStrategies = async () => {
+      loading.value = true
+      try {
+        // Simulate API call - replace with actual API
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        
+        // Mock data - replace with actual data from store/API
+        strategies.value = [
+          {
+            id: 1,
+            name: 'استراتژی میانگین متحرک',
+            description: 'استراتژی مبتنی بر تقاطع میانگین‌های متحرک کوتاه و بلند مدت',
+            type: 'technical',
+            status: 'active',
+            symbols: ['فولاد', 'خودرو', 'وبصادر'],
+            timeframe: '1h',
+            performance: {
+              totalProfit: 2500000,
+              winRate: 0.65,
+              sharpeRatio: 1.8
+            },
+            createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+            updatedAt: new Date()
+          },
+          {
+            id: 2,
+            name: 'پیش‌بینی هوش مصنوعی',
+            description: 'استراتژی پیشرفته مبتنی بر مدل‌های یادگیری عمیق',
+            type: 'ai_based',
+            status: 'inactive',
+            symbols: ['BTC/USDT', 'ETH/USDT'],
+            timeframe: '15m',
+            performance: {
+              totalProfit: 1800000,
+              winRate: 0.72,
+              sharpeRatio: 2.1
+            },
+            createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+            updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+          },
+          {
+            id: 3,
+            name: 'آربیتراژ بازار',
+            description: 'استراتژی آربیتراژ بین صرافی‌های مختلف',
+            type: 'custom',
+            status: 'paused',
+            symbols: ['BTC/USDT', 'ETH/USDT', 'LTC/USDT'],
+            timeframe: '5m',
+            performance: {
+              totalProfit: 3200000,
+              winRate: 0.58,
+              sharpeRatio: 1.5
+            },
+            createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+            updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
+          }
+        ]
+      } catch (error) {
+        toast.error('خطا در بارگذاری استراتژی‌ها')
+        console.error('Load strategies error:', error)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const refreshStrategies = () => {
+      currentPage.value = 1
+      selectedStrategies.value = []
+      loadStrategies()
+      toast.success('استراتژی‌ها بروزرسانی شد')
+    }
+
+    const toggleActionMenu = (strategyId) => {
+      activeActionMenu.value = activeActionMenu.value === strategyId ? null : strategyId
+    }
+
+    const editStrategy = (strategy) => {
+      router.push(`/strategies/edit/${strategy.id}`)
+    }
+
+    const cloneStrategy = (strategy) => {
+      // Implement clone strategy
+      toast.success(`استراتژی "${strategy.name}" کپی شد`)
+    }
+
+    const toggleStrategy = async (strategy) => {
+      try {
+        const newStatus = strategy.status === 'active' ? 'inactive' : 'active'
+        // Call API to toggle strategy status
+        await store.dispatch('strategies/toggleStrategy', {
+          strategyId: strategy.id,
+          status: newStatus
+        })
+        
+        strategy.status = newStatus
+        toast.success(`استراتژی ${newStatus === 'active' ? 'فعال' : 'غیرفعال'} شد`)
+      } catch (error) {
+        toast.error('خطا در تغییر وضعیت استراتژی')
+      }
+    }
+
+    const runBacktest = (strategy) => {
+      router.push(`/backtesting?strategy=${strategy.id}`)
+    }
+
+    const deleteStrategy = (strategy) => {
+      strategyToDelete.value = strategy
+      showDeleteModal.value = true
+    }
+
+    const confirmDelete = async () => {
+      try {
+        // Call API to delete strategy
+        await store.dispatch('strategies/deleteStrategy', strategyToDelete.value.id)
+        
+        strategies.value = strategies.value.filter(s => s.id !== strategyToDelete.value.id)
+        showDeleteModal.value = false
+        toast.success('استراتژی با موفقیت حذف شد')
+      } catch (error) {
+        toast.error('خطا در حذف استراتژی')
+      }
+    }
+
+    const viewStrategy = (strategy) => {
+      router.push(`/strategies/${strategy.id}`)
+    }
+
+    const bulkActivate = async () => {
+      try {
+        // Call API to bulk activate
+        await store.dispatch('strategies/bulkUpdateStatus', {
+          strategyIds: selectedStrategies.value,
+          status: 'active'
+        })
+        
+        strategies.value.forEach(s => {
+          if (selectedStrategies.value.includes(s.id)) {
+            s.status = 'active'
+          }
+        })
+        
+        clearSelection()
+        toast.success('استراتژی‌های انتخاب شده فعال شدند')
+      } catch (error) {
+        toast.error('خطا در فعال‌سازی استراتژی‌ها')
+      }
+    }
+
+    const bulkDeactivate = async () => {
+      try {
+        // Call API to bulk deactivate
+        await store.dispatch('strategies/bulkUpdateStatus', {
+          strategyIds: selectedStrategies.value,
+          status: 'inactive'
+        })
+        
+        strategies.value.forEach(s => {
+          if (selectedStrategies.value.includes(s.id)) {
+            s.status = 'inactive'
+          }
+        })
+        
+        clearSelection()
+        toast.success('استراتژی‌های انتخاب شده غیرفعال شدند')
+      } catch (error) {
+        toast.error('خطا در غیرفعال‌سازی استراتژی‌ها')
+      }
+    }
+
+    const bulkDelete = async () => {
+      try {
+        // Call API to bulk delete
+        await store.dispatch('strategies/bulkDelete', selectedStrategies.value)
+        
+        strategies.value = strategies.value.filter(
+          s => !selectedStrategies.value.includes(s.id)
+        )
+        
+        clearSelection()
+        toast.success('استراتژی‌های انتخاب شده حذف شدند')
+      } catch (error) {
+        toast.error('خطا در حذف استراتژی‌ها')
+      }
+    }
+
+    const clearSelection = () => {
+      selectedStrategies.value = []
+      showBulkActions.value = false
+    }
+
+    const getStrategyCardClass = (strategy) => {
+      return {
+        'active-strategy': strategy.status === 'active',
+        'inactive-strategy': strategy.status === 'inactive',
+        'paused-strategy': strategy.status === 'paused'
+      }
+    }
+
+    const getTypeText = (type) => {
+      const typeMap = {
+        technical: 'تکنیکال',
+        ai_based: 'هوش مصنوعی',
+        custom: 'سفارشی'
+      }
+      return typeMap[type] || type
+    }
+
+    const getStatusClass = (status) => {
+      return `status-${status}`
+    }
+
+    const getStatusIcon = (status) => {
+      const icons = {
+        active: 'icon-play',
+        inactive: 'icon-pause',
+        paused: 'icon-stop'
+      }
+      return icons[status] || 'icon-help-circle'
+    }
+
+    const getStatusText = (status) => {
+      const statusMap = {
+        active: 'فعال',
+        inactive: 'غیرفعال',
+        paused: 'متوقف شده'
+      }
+      return statusMap[status] || status
+    }
+
+    const getPerformanceClass = (profit) => {
+      return profit >= 0 ? 'text-profit' : 'text-loss'
+    }
+
+    const formatDate = (timestamp) => {
+      return new Date(timestamp).toLocaleDateString('fa-IR')
+    }
+
+    const formatNumber = (num) => {
+      return new Intl.NumberFormat('fa-IR').format(num)
+    }
+
+    const formatPercentage = (num) => {
+      return new Intl.NumberFormat('fa-IR', {
+        style: 'percent',
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+      }).format(num)
+    }
+
+    // Close dropdown when clicking outside
+    const closeDropdowns = (event) => {
+      if (!event.target.closest('.action-menu')) {
+        activeActionMenu.value = null
+      }
+    }
+
+    // Lifecycle
+    onMounted(() => {
+      loadStrategies()
+      document.addEventListener('click', closeDropdowns)
+    })
+
+    return {
+      strategies,
+      loading,
+      showBulkActions,
+      showDeleteModal,
+      activeActionMenu,
+      currentPage,
+      pageSize,
+      selectedStrategies,
+      strategyToDelete,
+      filters,
+      stats,
+      filteredStrategies,
+      hasSelectedStrategies,
+      totalPages,
+      paginatedStrategies,
+      refreshStrategies,
+      toggleActionMenu,
+      editStrategy,
+      cloneStrategy,
+      toggleStrategy,
+      runBacktest,
+      deleteStrategy,
+      confirmDelete,
+      viewStrategy,
+      bulkActivate,
+      bulkDeactivate,
+      bulkDelete,
+      clearSelection,
+      getStrategyCardClass,
+      getTypeText,
+      getStatusClass,
+      getStatusIcon,
+      getStatusText,
+      getPerformanceClass,
+      formatDate,
+      formatNumber,
+      formatPercentage
+    }
+  }
+}
+</script>
+
+<style scoped>
+.strategy-list {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  padding: var(--space-6);
+  border: 1px solid var(--border-primary);
+  height: 100%;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-6);
+}
+
+.section-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.strategy-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-primary);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius);
+  color: white;
+}
+
+.stat-icon.active {
+  background: var(--color-profit);
+}
+
+.stat-icon.inactive {
+  background: var(--color-gray-500);
+}
+
+.stat-icon.profit {
+  background: var(--color-secondary);
+}
+
+.stat-icon.total {
+  background: var(--color-primary);
+}
+
+.stat-icon i {
+  font-size: 1.5rem;
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+}
+
+.list-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.controls-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.search-box {
+  position: relative;
+  min-width: 250px;
+}
+
+.search-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-8);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--border-radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.search-icon {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+.filter-select {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--border-radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  min-width: 120px;
+}
+
+.bulk-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-primary);
+  margin-bottom: var(--space-6);
+}
+
+.bulk-info {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.bulk-buttons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.strategies-grid {
+  min-height: 400px;
+}
+
+.loading-state, .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  color: var(--text-muted);
+  gap: var(--space-3);
+}
+
+.loading-state i, .empty-state i {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+.empty-state p {
+  margin: 0;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: var(--space-4);
+}
+
+.strategy-card {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-primary);
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.strategy-card:hover {
+  border-color: var(--color-secondary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.active-strategy {
+  border-right: 3px solid var(--color-profit);
+}
+
+.inactive-strategy {
+  border-right: 3px solid var(--color-gray-500);
+}
+
+.paused-strategy {
+  border-right: 3px solid var(--color-warning);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.strategy-info {
+  flex: 1;
+}
+
+.strategy-name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-1) 0;
+  line-height: var(--line-height-tight);
+}
+
+.strategy-type {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: var(--border-radius-sm);
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.strategy-checkbox {
+  width: 18px;
+  height: 18px;
+}
+
+.action-menu {
+  position: relative;
+}
+
+.dropdown-menu {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  z-index: 10;
+  min-width: 160px;
+  padding: var(--space-2) 0;
+}
+
+.dropdown-item {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  text-align: right;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.dropdown-item:hover {
+  background: var(--bg-secondary);
+}
+
+.dropdown-item.danger {
+  color: var(--color-loss);
+}
+
+.dropdown-item.danger:hover {
+  background: rgba(255, 71, 87, 0.1);
+}
+
+.dropdown-divider {
+  border: none;
+  border-top: 1px solid var(--border-primary);
+  margin: var(--space-2) 0;
+}
+
+.card-content {
+  padding: var(--space-4);
+}
+
+.strategy-description {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  margin-bottom: var(--space-4);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.strategy-meta {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.meta-item i {
+  font-size: 14px;
+}
+
+.strategy-performance {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  background: var(--bg-tertiary);
+  border-radius: var(--border-radius);
+  padding: var(--space-3);
+}
+
+.performance-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.performance-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.performance-value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  font-family: var(--font-family-monospace);
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4);
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 8px;
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.status-active {
+  background: rgba(0, 200, 150, 0.1);
+  color: var(--color-profit);
+}
+
+.status-inactive {
+  background: rgba(116, 125, 140, 0.1);
+  color: var(--color-gray-500);
+}
+
+.status-paused {
+  background: rgba(255, 165, 2, 0.1);
+  color: var(--color-warning);
+}
+
+.footer-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-primary);
+}
+
+.pagination-btn {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--border-radius);
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--color-secondary);
+  border-color: var(--color-secondary);
+  color: white;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.delete-modal {
+  text-align: center;
+  padding: var(--space-4);
+}
+
+.warning-icon {
+  font-size: 3rem;
+  color: var(--color-warning);
+  margin-bottom: var(--space-4);
+}
+
+.delete-modal h4 {
+  color: var(--text-primary);
+  margin-bottom: var(--space-3);
+}
+
+.delete-modal p {
+  color: var(--text-muted);
+  margin-bottom: var(--space-6);
+}
+
+.modal-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+@media (max-width: 1024px) {
+  .grid-container {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .list-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  
+  .list-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .controls-left {
+    justify-content: space-between;
+  }
+  
+  .search-box {
+    min-width: auto;
+  }
+  
+  .bulk-actions {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  
+  .bulk-buttons {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .grid-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .card-footer {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  
+  .footer-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+}
+</style>
