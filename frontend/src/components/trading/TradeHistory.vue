@@ -383,74 +383,14 @@ export default {
     })
 
     // Methods
-    const loadTrades = async () => {
-      loading.value = true
-      try {
-        // Simulate API call - replace with actual API
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        // Mock data - replace with actual data from store/API
-        trades.value = [
-          {
-            id: 1,
-            symbol: 'فولاد',
-            side: 'buy',
-            quantity: 1000,
-            price: 14500,
-            fee: 1450,
-            pnl: 700000,
-            pnlPercent: 0.048,
-            strategy: 'میانگین متحرک',
-            exchange: 'TSETMC',
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000)
-          },
-          {
-            id: 2,
-            symbol: 'خودرو',
-            side: 'sell',
-            quantity: 500,
-            price: 32000,
-            fee: 1600,
-            pnl: -250000,
-            pnlPercent: -0.015,
-            strategy: null,
-            exchange: 'TSETMC',
-            timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000)
-          },
-          {
-            id: 3,
-            symbol: 'BTC/USDT',
-            side: 'buy',
-            quantity: 0.1,
-            price: 250000000,
-            fee: 250000,
-            pnl: 500000,
-            pnlPercent: 0.02,
-            strategy: 'AI Prediction',
-            exchange: 'Nobitex',
-            timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000)
-          },
-          {
-            id: 4,
-            symbol: 'ETH/USDT',
-            side: 'sell',
-            quantity: 1,
-            price: 18000000,
-            fee: 18000,
-            pnl: 200000,
-            pnlPercent: 0.011,
-            strategy: 'RSI Strategy',
-            exchange: 'Nobitex',
-            timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
-          }
-        ]
-      } catch (error) {
-        toast.error('خطا در بارگذاری تاریخچه معاملات')
-        console.error('Load trades error:', error)
-      } finally {
-        loading.value = false
-      }
-    }
+    const loadStrategies = async () => {
+  try {
+    const response = await store.dispatch('strategies/getStrategies')
+    strategies.value = response.data
+  } catch (error) {
+    // handle error
+  }
+}
 
     const refreshTrades = () => {
       currentPage.value = 1
