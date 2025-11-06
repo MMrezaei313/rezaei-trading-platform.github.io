@@ -444,69 +444,13 @@ export default {
 
     // Methods
     const loadStrategies = async () => {
-      loading.value = true
-      try {
-        // Simulate API call - replace with actual API
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        
-        // Mock data - replace with actual data from store/API
-        strategies.value = [
-          {
-            id: 1,
-            name: 'استراتژی میانگین متحرک',
-            description: 'استراتژی مبتنی بر تقاطع میانگین‌های متحرک کوتاه و بلند مدت',
-            type: 'technical',
-            status: 'active',
-            symbols: ['فولاد', 'خودرو', 'وبصادر'],
-            timeframe: '1h',
-            performance: {
-              totalProfit: 2500000,
-              winRate: 0.65,
-              sharpeRatio: 1.8
-            },
-            createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-            updatedAt: new Date()
-          },
-          {
-            id: 2,
-            name: 'پیش‌بینی هوش مصنوعی',
-            description: 'استراتژی پیشرفته مبتنی بر مدل‌های یادگیری عمیق',
-            type: 'ai_based',
-            status: 'inactive',
-            symbols: ['BTC/USDT', 'ETH/USDT'],
-            timeframe: '15m',
-            performance: {
-              totalProfit: 1800000,
-              winRate: 0.72,
-              sharpeRatio: 2.1
-            },
-            createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-            updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
-          },
-          {
-            id: 3,
-            name: 'آربیتراژ بازار',
-            description: 'استراتژی آربیتراژ بین صرافی‌های مختلف',
-            type: 'custom',
-            status: 'paused',
-            symbols: ['BTC/USDT', 'ETH/USDT', 'LTC/USDT'],
-            timeframe: '5m',
-            performance: {
-              totalProfit: 3200000,
-              winRate: 0.58,
-              sharpeRatio: 1.5
-            },
-            createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-            updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
-          }
-        ]
-      } catch (error) {
-        toast.error('خطا در بارگذاری استراتژی‌ها')
-        console.error('Load strategies error:', error)
-      } finally {
-        loading.value = false
-      }
-    }
+  try {
+    const response = await store.dispatch('strategies/getStrategies')
+    strategies.value = response.data
+  } catch (error) {
+    // handle error
+  }
+}
 
     const refreshStrategies = () => {
       currentPage.value = 1
